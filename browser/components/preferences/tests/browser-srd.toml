@@ -47,6 +47,8 @@ skip-if = [
 
 ["browser_colors_dialog.js"]
 
+["browser_device_spoofing_pane.js"]
+
 ["browser_fluent.js"]
 
 ["browser_legacy_pane_mappings.js"]

@@ -3824,3 +3824,48 @@ pref("distribution.mozillaonline.ignore", true);
 #ifdef XP_MACOSX
   pref("browser.macAppMenu.setAsDefaultShown", false);
 #endif
+
+// Low-memory profile: disable browser features not needed for plain browsing
+// with extensions. Web platform features and security protections stay on.
+pref("dom.ipc.processCount", 4);
+pref("dom.ipc.processPrelaunch.enabled", false);
+pref("browser.sessionhistory.max_total_viewers", 0);
+pref("browser.sessionstore.max_tabs_undo", 3);
+pref("browser.cache.memory.capacity", 32768);
+pref("browser.tabs.unloadOnLowMemory", true);
+pref("accessibility.force_disabled", 1);
+
+pref("browser.startup.homepage", "about:blank");
+pref("browser.newtab.preload", false);
+
+pref("browser.ml.enable", false);
+pref("browser.ml.chat.enabled", false);
+pref("browser.ml.linkPreview.enabled", false);
+pref("browser.translations.enable", false);
+pref("reader.parse-on-load.enabled", false);
+pref("identity.fxaccounts.enabled", false);
+pref("extensions.formautofill.addresses.enabled", false);
+pref("extensions.formautofill.creditCards.enabled", false);
+pref("browser.urlbar.suggest.trending", false);
+
+pref("network.prefetch-next", false);
+pref("browser.places.speculativeConnect.enabled", false);
+pref("browser.urlbar.speculativeConnect.enabled", false);
+
+pref("datareporting.policy.dataSubmissionEnabled", false);
+pref("toolkit.telemetry.unified", false);
+pref("app.normandy.enabled", false);
+pref("app.shield.optoutstudies.enabled", false);
+pref("browser.discovery.enabled", false);
+pref("extensions.htmlaboutaddons.recommendations.enabled", false);
+
+// Device/OS spoofing. Empty preset disables it; otherwise one of
+// "windows", "macos", "linux", "android". See DeviceSpoofing.sys.mjs.
+pref("browser.deviceSpoofing.preset", "");
+pref("browser.deviceSpoofing.navigator", true);
+pref("browser.deviceSpoofing.graphics", true);
+pref("browser.deviceSpoofing.input", true);
+pref("browser.deviceSpoofing.appearance", true);
+pref("browser.deviceSpoofing.fonts", true);
+pref("browser.deviceSpoofing.window", true);
+pref("browser.deviceSpoofing.speech", true);

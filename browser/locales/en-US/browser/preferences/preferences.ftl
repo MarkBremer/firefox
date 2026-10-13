@@ -2752,3 +2752,66 @@ referrals-section-header2 =
 # use the browser. "Share" here means recommending or referring the browser
 referrals-link2 =
   .label = Share { -brand-product-name }
+
+## Device and OS spoofing page
+
+pane-device-spoofing-title = Device spoofing
+  .title = Device spoofing
+
+device-spoofing-section =
+    .heading = Device spoofing
+
+device-spoofing-profile-group =
+    .label = Reported device
+    .description = Websites can detect your operating system from many signals besides the user agent. Choose which device to report and which signals to align with it.
+
+device-spoofing-preset =
+    .label = Report this device to websites
+
+device-spoofing-preset-off =
+    .label = Real device (no spoofing)
+device-spoofing-preset-windows =
+    .label = Windows 10/11 desktop
+device-spoofing-preset-macos =
+    .label = macOS desktop
+device-spoofing-preset-linux =
+    .label = Linux desktop
+device-spoofing-preset-android =
+    .label = Android phone
+
+device-spoofing-rfp-warning =
+    .message = Resist Fingerprinting (privacy.resistFingerprinting) is on. It replaces most of these values with ones for your real operating system, so spoofing will be inconsistent.
+
+device-spoofing-reload-notice =
+    .message = Changes apply to newly loaded pages. Reload open tabs, and open new tabs for touch changes. Exact font shapes and GPU rendering details can still reveal your real system.
+
+device-spoofing-signals-group =
+    .label = Signals to spoof
+
+device-spoofing-navigator =
+    .label = User agent and navigator properties
+    .description = HTTP User-Agent header, navigator.userAgent, platform, oscpu and appVersion, in pages and workers.
+
+device-spoofing-graphics =
+    .label = Graphics driver
+    .description = WebGL vendor, renderer and driver limits (for example Direct3D on Windows, Mesa on Linux).
+
+device-spoofing-input =
+    .label = Touch and pointer
+    .description = Touch event support, navigator.maxTouchPoints and the pointer and hover media queries.
+
+device-spoofing-appearance =
+    .label = Scrollbars and system colors
+    .description = Scrollbar style and width, system color keywords, and platform-only CSS properties.
+
+device-spoofing-fonts =
+    .label = Fonts
+    .description = Report the chosen system’s fonts and default fonts, drawn with similar local fonts when missing, and hide all other installed fonts.
+
+device-spoofing-window =
+    .label = Window frame size
+    .description = Report the window’s outer size as its inner size, hiding title bar and border sizes.
+
+device-spoofing-speech =
+    .label = Speech synthesis voices
+    .description = Disable speech synthesis, whose voice list is specific to the operating system.

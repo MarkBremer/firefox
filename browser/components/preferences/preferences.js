@@ -397,6 +397,12 @@ const CONFIG_PANES = Object.freeze({
     module: "chrome://browser/content/preferences/config/permissions-data.mjs",
     visible: () => srdSectionEnabled("permissionsData"),
   },
+  deviceSpoofing: {
+    l10nId: "device-spoofing-section",
+    iconSrc: "chrome://browser/skin/fingerprint.svg",
+    groupIds: ["deviceSpoofingProfile", "deviceSpoofingSignals"],
+    module: "chrome://browser/content/preferences/config/device-spoofing.mjs",
+  },
   personalizeSmartWindow: {
     parent: "ai",
     l10nId: "ai-window-personalize-header",

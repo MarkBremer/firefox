@@ -153,6 +153,8 @@ EXTRA_JS_MODULES += [
 MOZ_SRC_FILES += [
     "CanvasPermissionPromptHelper.sys.mjs",
     "ContextId.sys.mjs",
+    "DeviceSpoofing.sys.mjs",
+    "DeviceSpoofingChild.sys.mjs",
     "ObserverForwarder.sys.mjs",
     "PrivateBrowsingUI.sys.mjs",
     "SerialDeviceSharingHelper.sys.mjs",
