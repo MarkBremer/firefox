@@ -39,6 +39,7 @@ New **Settings → Device spoofing** pane. Choose a device to report (Windows
 | Signal | What websites see | Mechanism |
 |---|---|---|
 | User agent and navigator | HTTP `User-Agent`, `navigator.userAgent`, `platform`, `oscpu`, `appVersion` (pages and workers); Firefox version kept current on every start | `general.*.override` prefs |
+| Processor | Windows 64-bit (`Win64; x64`) or 32-bit user agent; `navigator.hardwareConcurrency` (2 to 16, only lower than real) | `general.*.override` prefs; `dom.maxHardwareConcurrency` |
 | Graphics driver | WebGL vendor/renderer for a chosen GPU (RTX 3060 Ti, RTX 4070, GTX 1660 SUPER, RX 6700 XT, UHD 630) or custom strings, in the OS-specific driver format; Windows ANGLE limits (`MAX_VARYING_VECTORS` 30, `MAX_VARYING_COMPONENTS` 120) | `webgl.override-unmasked-*` prefs; `getParameter()` wrapped per page by a JS window actor |
 | Touch and pointer | Touch events, `maxTouchPoints`, `pointer`/`hover` media queries | `dom.w3c_touch_events.enabled`, `dom.maxtouchpoints.testing.value`, `ui.*PointerCapabilities` |
 | Scrollbars and system colors | Scrollbar style and width (17 px on Windows), stand-in system colors, no `-moz-osx-font-smoothing` | `widget.non-native-theme.scrollbar.*`, `ui.useOverlayScrollbars`, `ui.use_standins_for_native_colors`, fingerprinting-protection target |

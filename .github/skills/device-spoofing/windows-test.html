@@ -553,6 +553,14 @@ function deviceInfo() {
   addI("Window position", `${screenX}, ${screenY}`);
   addI("Orientation", screen.orientation?.type ?? "?");
   addI("hardwareConcurrency", navigator.hardwareConcurrency);
+  const ua = navigator.userAgent;
+  let arch = "32-bit x86";
+  if (/aarch64|arm/i.test(ua + navigator.platform)) {
+    arch = "ARM";
+  } else if (/Win64|WOW64|x64|x86_64|amd64|Intel Mac/i.test(ua)) {
+    arch = "64-bit x86";
+  }
+  addI("Architecture (from user agent)", arch);
   addI("Language", `${navigator.language} (${navigator.languages.join(", ")})`);
   addI("Time zone", Intl.DateTimeFormat().resolvedOptions().timeZone);
   if (mainGL) {

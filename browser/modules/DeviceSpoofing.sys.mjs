@@ -444,16 +444,34 @@ function buildFontSheet(families) {
  * `browser.deviceSpoofing.<category>`.
  */
 const CATEGORIES = {
-  navigator: (preset, version) => {
+  navigator: (preset, version, presetName) => {
     let gecko = preset.geckoTrail ?? version;
+    let { uaOS, oscpu } = preset;
+    // Firefox freezes the architecture elsewhere (x86_64 on Linux, Intel on
+    // macOS, ARM on Android); only Windows has a real 32-bit variant.
+    if (
+      presetName == "windows" &&
+      Services.prefs.getBoolPref(PREF_BRANCH + "cpu", true) &&
+      Services.prefs.getStringPref(PREF_BRANCH + "cpu.arch", "") == "x86"
+    ) {
+      uaOS = uaOS.replace("; Win64; x64", "");
+      oscpu = oscpu.replace("; Win64; x64", "");
+    }
     return {
       prefs: {
-        "general.useragent.override": `Mozilla/5.0 (${preset.uaOS}; rv:${version}) Gecko/${gecko} Firefox/${version}`,
+        "general.useragent.override": `Mozilla/5.0 (${uaOS}; rv:${version}) Gecko/${gecko} Firefox/${version}`,
         "general.platform.override": preset.platform,
-        "general.oscpu.override": preset.oscpu,
+        "general.oscpu.override": oscpu,
         "general.appversion.override": preset.appVersion,
       },
     };
+  },
+  cpu: () => {
+    let cores = parseInt(
+      Services.prefs.getStringPref(PREF_BRANCH + "cpu.cores", "")
+    );
+    // Gecko can only lower the reported core count.
+    return cores > 0 ? { prefs: { "dom.maxHardwareConcurrency": cores } } : {};
   },
   graphics: (preset, _version, presetName) => {
     let gpu = Services.prefs.getStringPref(PREF_BRANCH + "gpu", "");

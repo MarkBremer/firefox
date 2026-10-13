@@ -3865,6 +3865,14 @@ pref("extensions.htmlaboutaddons.recommendations.enabled", false);
 pref("browser.deviceSpoofing.preset", "");
 // User agent header, navigator.userAgent/platform/oscpu/appVersion.
 pref("browser.deviceSpoofing.navigator", true);
+// CPU architecture and core count.
+pref("browser.deviceSpoofing.cpu", true);
+// Windows only: "" for 64-bit (x64), "x86" for 32-bit. Other OSes report a
+// fixed architecture in Firefox.
+pref("browser.deviceSpoofing.cpu.arch", "");
+// navigator.hardwareConcurrency, e.g. "4"; empty keeps the real value. Can
+// only report fewer cores than the machine has.
+pref("browser.deviceSpoofing.cpu.cores", "");
 // WebGL vendor, renderer and driver limits.
 pref("browser.deviceSpoofing.graphics", true);
 // GPU to report: empty for the device's default, a key of GPUS in

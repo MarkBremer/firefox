@@ -2792,6 +2792,34 @@ device-spoofing-navigator =
     .label = User agent and navigator properties
     .description = HTTP User-Agent header, navigator.userAgent, platform, oscpu and appVersion, in pages and workers.
 
+device-spoofing-cpu =
+    .label = Processor
+    .description = Processor architecture in the user agent and the number of cores (navigator.hardwareConcurrency).
+
+device-spoofing-cpu-arch =
+    .label = Architecture
+
+device-spoofing-cpu-arch-x64 =
+    .label = 64-bit (x64)
+
+device-spoofing-cpu-arch-x86 =
+    .label = 32-bit (x86)
+
+device-spoofing-cpu-arch-fixed =
+    .message = { -brand-short-name } always reports the same architecture on this device (x86-64 on Linux, Intel on macOS, ARM on Android), even on other processors. Reporting another one would make you stand out.
+
+device-spoofing-cpu-cores =
+    .label = Processor cores
+    .description = Only fewer cores than this computer has can be reported. Private windows round the value to 4 or 8.
+
+device-spoofing-cpu-cores-real =
+    .label = Real value
+
+# Variables:
+#   $cores (number) - Number of processor cores
+device-spoofing-cpu-cores-value =
+    .label = { $cores }
+
 device-spoofing-graphics =
     .label = Graphics driver
     .description = WebGL vendor, renderer and driver limits (for example Direct3D on Windows, Mesa on Linux).

@@ -147,6 +147,26 @@ add_task(async function test_prefs_applied_and_reverted() {
   Services.prefs.clearUserPref("browser.deviceSpoofing.gpu");
   Services.prefs.clearUserPref("browser.deviceSpoofing.gpu.customRenderer");
 
+  Services.prefs.setStringPref("browser.deviceSpoofing.cpu.arch", "x86");
+  Services.prefs.setStringPref("browser.deviceSpoofing.cpu.cores", "2");
+  ok(
+    !Services.prefs
+      .getStringPref("general.useragent.override")
+      .includes("Win64"),
+    "32-bit Windows user agent"
+  );
+  is(
+    Services.prefs.getIntPref("dom.maxHardwareConcurrency"),
+    2,
+    "Core count is capped"
+  );
+  Services.prefs.clearUserPref("browser.deviceSpoofing.cpu.arch");
+  Services.prefs.clearUserPref("browser.deviceSpoofing.cpu.cores");
+  ok(
+    !Services.prefs.prefHasUserValue("dom.maxHardwareConcurrency"),
+    "Core cap removed"
+  );
+
   Services.prefs.setStringPref(PRESET_PREF, "android");
   is(
     Services.prefs.getStringPref("general.platform.override"),

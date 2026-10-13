@@ -11,6 +11,7 @@ const { DeviceSpoofing, GPUS } = ChromeUtils.importESModule(
 
 const CATEGORY_SETTINGS = {
   navigator: "deviceSpoofingNavigator",
+  cpu: "deviceSpoofingCPU",
   graphics: "deviceSpoofingGraphics",
   input: "deviceSpoofingInput",
   appearance: "deviceSpoofingAppearance",
@@ -45,6 +46,8 @@ Preferences.addAll([
   { id: "browser.deviceSpoofing.screen.customResolution", type: "string" },
   { id: "browser.deviceSpoofing.screen.dppx", type: "string" },
   { id: "browser.deviceSpoofing.gpu", type: "string" },
+  { id: "browser.deviceSpoofing.cpu.arch", type: "string" },
+  { id: "browser.deviceSpoofing.cpu.cores", type: "string" },
   { id: "browser.deviceSpoofing.gpu.customVendor", type: "string" },
   { id: "browser.deviceSpoofing.gpu.customRenderer", type: "string" },
   { id: "browser.deviceSpoofing.foreground", type: "bool" },
@@ -119,6 +122,30 @@ Preferences.addSetting({
     deviceSpoofingScreenResolution.value == "custom",
   disabled: ({ deviceSpoofingPreset, deviceSpoofingScreen }) =>
     !deviceSpoofingPreset.value || !deviceSpoofingScreen.value,
+});
+
+const cpuDisabled = ({ deviceSpoofingPreset, deviceSpoofingCPU }) =>
+  !deviceSpoofingPreset.value || !deviceSpoofingCPU.value;
+
+Preferences.addSetting({
+  id: "deviceSpoofingCPUArch",
+  pref: "browser.deviceSpoofing.cpu.arch",
+  deps: ["deviceSpoofingPreset", "deviceSpoofingCPU"],
+  visible: ({ deviceSpoofingPreset }) =>
+    !deviceSpoofingPreset.value || deviceSpoofingPreset.value == "windows",
+  disabled: cpuDisabled,
+});
+Preferences.addSetting({
+  id: "deviceSpoofingCPUArchFixed",
+  deps: ["deviceSpoofingPreset"],
+  visible: ({ deviceSpoofingPreset }) =>
+    !!deviceSpoofingPreset.value && deviceSpoofingPreset.value != "windows",
+});
+Preferences.addSetting({
+  id: "deviceSpoofingCPUCores",
+  pref: "browser.deviceSpoofing.cpu.cores",
+  deps: ["deviceSpoofingPreset", "deviceSpoofingCPU"],
+  disabled: cpuDisabled,
 });
 
 const graphicsDisabled = ({ deviceSpoofingPreset, deviceSpoofingGraphics }) =>
@@ -198,6 +225,40 @@ SettingGroupManager.registerGroups({
       {
         id: "deviceSpoofingNavigator",
         l10nId: "device-spoofing-navigator",
+      },
+      {
+        id: "deviceSpoofingCPU",
+        l10nId: "device-spoofing-cpu",
+        items: [
+          {
+            id: "deviceSpoofingCPUArch",
+            l10nId: "device-spoofing-cpu-arch",
+            control: "moz-select",
+            options: [
+              { value: "", l10nId: "device-spoofing-cpu-arch-x64" },
+              { value: "x86", l10nId: "device-spoofing-cpu-arch-x86" },
+            ],
+          },
+          {
+            id: "deviceSpoofingCPUArchFixed",
+            l10nId: "device-spoofing-cpu-arch-fixed",
+            control: "moz-message-bar",
+            controlAttrs: { type: "info" },
+          },
+          {
+            id: "deviceSpoofingCPUCores",
+            l10nId: "device-spoofing-cpu-cores",
+            control: "moz-select",
+            options: [
+              { value: "", l10nId: "device-spoofing-cpu-cores-real" },
+              ...["2", "4", "6", "8", "12", "16"].map(cores => ({
+                value: cores,
+                l10nId: "device-spoofing-cpu-cores-value",
+                l10nArgs: { cores },
+              })),
+            ],
+          },
+        ],
       },
       {
         id: "deviceSpoofingGraphics",

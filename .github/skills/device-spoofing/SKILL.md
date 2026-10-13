@@ -108,6 +108,13 @@ tabs. The "foreground" option is independent of the preset.
   `privacy.baselineFingerprintingProtection.overrides` (baseline, on by default).
   Targets: `toolkit/components/resistfingerprinting/RFPTargets.inc`.
   `WindowOuterSize` was removed on purpose: outer == inner size is itself a tell.
+- CPU: Firefox freezes the architecture in UA/platform/oscpu (Linux always
+  `x86_64`, macOS always Intel, Android `armv81`, Windows ARM64 reports x64),
+  so only Windows 64/32-bit is offered (`cpu.arch`). Core count uses
+  `dom.maxHardwareConcurrency`, which can only lower the value; the FPP target
+  `NavigatorHWConcurrencyTiered` (default in private windows) overrides it.
+  Real architecture still leaks through hardware behavior (e.g. WebAssembly
+  relaxed SIMD results), which cannot be changed without C++.
 - WebGL: `webgl.override-unmasked-vendor/renderer`. Firefox sanitizes renderer
   strings into buckets (`dom/canvas/SanitizeRenderer.cpp`, e.g. RTX 3060 Ti ->
   "GeForce GTX 980, or similar"), exactly as for real GPUs; give raw driver
