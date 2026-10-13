@@ -65,7 +65,7 @@ add_task(async function test_prefs_applied_and_reverted() {
   for (let pref of FPP_PREFS) {
     let tokens = Services.prefs.getStringPref(pref).split(",");
     ok(
-      tokens.includes("+WindowOuterSize"),
+      tokens.includes("+WindowScreenXY"),
       `${pref} contains the spoofing targets`
     );
   }
@@ -91,6 +91,8 @@ add_task(async function test_prefs_applied_and_reverted() {
             .createElement("canvas")
             .getContext("webgl")
             ?.getParameter(0x8dfc),
+          screen: [screen.width, screen.height],
+          deviceWidth: matchMedia("(device-width: 1920px)").matches,
         })`)
       )
     );
@@ -107,6 +109,8 @@ add_task(async function test_prefs_applied_and_reverted() {
     if (values.varyings !== undefined) {
       is(values.varyings, 30, "WebGL varying limit matches ANGLE");
     }
+    Assert.deepEqual(values.screen, [1920, 1080], "Screen size is spoofed");
+    ok(values.deviceWidth, "CSS device-width matches the spoofed screen");
   });
 
   Services.prefs.setBoolPref("browser.deviceSpoofing.navigator", false);
@@ -119,6 +123,29 @@ add_task(async function test_prefs_applied_and_reverted() {
     "Other categories stay applied"
   );
   Services.prefs.clearUserPref("browser.deviceSpoofing.navigator");
+
+  Services.prefs.setStringPref(
+    "browser.deviceSpoofing.gpu",
+    "nvidia-rtx-3060-ti"
+  );
+  ok(
+    Services.prefs
+      .getStringPref("webgl.override-unmasked-renderer")
+      .includes("RTX 3060 Ti Direct3D11"),
+    "Selected GPU uses the Windows driver string"
+  );
+  Services.prefs.setStringPref("browser.deviceSpoofing.gpu", "custom");
+  Services.prefs.setStringPref(
+    "browser.deviceSpoofing.gpu.customRenderer",
+    "Custom Renderer"
+  );
+  is(
+    Services.prefs.getStringPref("webgl.override-unmasked-renderer"),
+    "Custom Renderer",
+    "Custom GPU renderer is used"
+  );
+  Services.prefs.clearUserPref("browser.deviceSpoofing.gpu");
+  Services.prefs.clearUserPref("browser.deviceSpoofing.gpu.customRenderer");
 
   Services.prefs.setStringPref(PRESET_PREF, "android");
   is(
@@ -143,4 +170,58 @@ add_task(async function test_prefs_applied_and_reverted() {
   ]) {
     ok(!Services.prefs.prefHasUserValue(pref), `${pref} reset when turned off`);
   }
+});
+
+add_task(async function test_foreground() {
+  Services.prefs.setBoolPref("browser.deviceSpoofing.foreground", true);
+  registerCleanupFunction(() =>
+    Services.prefs.clearUserPref("browser.deviceSpoofing.foreground")
+  );
+  is(
+    Services.prefs.getIntPref("dom.min_background_timeout_value"),
+    4,
+    "Background timers are not clamped"
+  );
+
+  let backgroundTab = await BrowserTestUtils.openNewForegroundTab(
+    gBrowser,
+    "https://example.com/"
+  );
+  await SpecialPowers.spawn(backgroundTab.linkedBrowser, [], () => {
+    content.wrappedJSObject.eval(
+      `window.events = [];
+       document.addEventListener("visibilitychange", () => events.push("vis"));
+       window.addEventListener("blur", () => events.push("blur"));`
+    );
+  });
+  let otherTab = await BrowserTestUtils.openNewForegroundTab(
+    gBrowser,
+    "https://example.org/"
+  );
+  await TestUtils.waitForCondition(
+    () => !backgroundTab.linkedBrowser.docShellIsActive,
+    "First tab is really in the background"
+  );
+
+  let state = await SpecialPowers.spawn(backgroundTab.linkedBrowser, [], () =>
+    JSON.parse(
+      content.wrappedJSObject.eval(
+        `JSON.stringify([document.hidden, document.visibilityState,
+                         document.hasFocus(), window.events])`
+      )
+    )
+  );
+  Assert.deepEqual(
+    state,
+    [false, "visible", true, []],
+    "Background tab looks visible and focused, without events"
+  );
+
+  BrowserTestUtils.removeTab(otherTab);
+  BrowserTestUtils.removeTab(backgroundTab);
+  Services.prefs.clearUserPref("browser.deviceSpoofing.foreground");
+  ok(
+    !Services.prefs.prefHasUserValue("dom.min_background_timeout_value"),
+    "Timer clamp restored"
+  );
 });

@@ -400,7 +400,11 @@ const CONFIG_PANES = Object.freeze({
   deviceSpoofing: {
     l10nId: "device-spoofing-section",
     iconSrc: "chrome://browser/skin/fingerprint.svg",
-    groupIds: ["deviceSpoofingProfile", "deviceSpoofingSignals"],
+    groupIds: [
+      "deviceSpoofingProfile",
+      "deviceSpoofingSignals",
+      "deviceSpoofingBehavior",
+    ],
     module: "chrome://browser/content/preferences/config/device-spoofing.mjs",
   },
   personalizeSmartWindow: {

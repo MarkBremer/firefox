@@ -4,26 +4,54 @@
 
 import { PRESETS } from "moz-src:///browser/modules/DeviceSpoofing.sys.mjs";
 
+const PREF_BRANCH = "browser.deviceSpoofing.";
+
 /**
- * Reports the spoofed preset's WebGL limits to web content. Gecko has no pref
- * for these, so WebGL getParameter() is wrapped in each new window.
+ * Applies the page-level parts of device spoofing to each new document,
+ * before page scripts run: WebGL limits that Gecko has no pref for, and
+ * hiding that the page is in a background tab or unfocused window.
  */
 export class DeviceSpoofingChild extends JSWindowActorChild {
   handleEvent() {
-    let preset =
-      PRESETS[
-        Services.prefs.getStringPref("browser.deviceSpoofing.preset", "")
-      ];
-    let params = preset?.webglParams;
-    if (
-      !params ||
-      !Services.prefs.getBoolPref("browser.deviceSpoofing.graphics", true) ||
-      this.document.nodePrincipal.isSystemPrincipal
-    ) {
+    if (this.document.nodePrincipal.isSystemPrincipal) {
       return;
     }
-
     let win = this.contentWindow;
+
+    let preset =
+      PRESETS[Services.prefs.getStringPref(PREF_BRANCH + "preset", "")];
+    if (
+      preset?.webglParams &&
+      Services.prefs.getBoolPref(PREF_BRANCH + "graphics", true)
+    ) {
+      this.#patchWebGL(win, preset.webglParams);
+    }
+    if (Services.prefs.getBoolPref(PREF_BRANCH + "foreground", false)) {
+      this.#patchForeground(win);
+    }
+  }
+
+  /**
+   * Replaces a method or getter on a content prototype with a chrome function
+   * that looks native to the page.
+   */
+  #define(win, proto, name, fn, isGetter = false) {
+    let exported = Cu.exportFunction(fn, win);
+    Object.defineProperty(
+      proto,
+      name,
+      isGetter
+        ? { get: exported, enumerable: true, configurable: true }
+        : {
+            value: exported,
+            writable: true,
+            enumerable: true,
+            configurable: true,
+          }
+    );
+  }
+
+  #patchWebGL(win, params) {
     for (let ctor of ["WebGLRenderingContext", "WebGL2RenderingContext"]) {
       let proto = win[ctor]?.prototype;
       if (!proto) {
@@ -31,18 +59,61 @@ export class DeviceSpoofingChild extends JSWindowActorChild {
       }
       let contentProto = Cu.waiveXrays(proto);
       let original = contentProto.getParameter;
-      let getParameter = function getParameter(pname) {
-        if (Object.hasOwn(params, pname)) {
-          return params[pname];
+      this.#define(
+        win,
+        contentProto,
+        "getParameter",
+        function getParameter(pname) {
+          if (Object.hasOwn(params, pname)) {
+            return params[pname];
+          }
+          return original.call(this, pname);
         }
-        return original.call(this, pname);
-      };
-      Object.defineProperty(contentProto, "getParameter", {
-        value: Cu.exportFunction(getParameter, win),
-        writable: true,
-        enumerable: true,
-        configurable: true,
-      });
+      );
+    }
+  }
+
+  #patchForeground(win) {
+    let docProto = Cu.waiveXrays(win.Document.prototype);
+    this.#define(
+      win,
+      docProto,
+      "hidden",
+      function hidden() {
+        return false;
+      },
+      true
+    );
+    this.#define(
+      win,
+      docProto,
+      "visibilityState",
+      function visibilityState() {
+        return "visible";
+      },
+      true
+    );
+    this.#define(win, docProto, "hasFocus", function hasFocus() {
+      return true;
+    });
+
+    // Registered before any page listener, so they run first.
+    win.addEventListener(
+      "visibilitychange",
+      event => event.stopImmediatePropagation(),
+      true
+    );
+    for (let type of ["blur", "focus"]) {
+      win.addEventListener(
+        type,
+        event => {
+          // Only window focus changes; element focus stays observable.
+          if (event.target == event.currentTarget) {
+            event.stopImmediatePropagation();
+          }
+        },
+        true
+      );
     }
   }
 }

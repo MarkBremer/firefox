@@ -3859,13 +3859,39 @@ pref("app.shield.optoutstudies.enabled", false);
 pref("browser.discovery.enabled", false);
 pref("extensions.htmlaboutaddons.recommendations.enabled", false);
 
-// Device/OS spoofing. Empty preset disables it; otherwise one of
-// "windows", "macos", "linux", "android". See DeviceSpoofing.sys.mjs.
+// Device/OS spoofing, see browser/modules/DeviceSpoofing.sys.mjs and
+// Settings > Device spoofing. Empty preset disables it; otherwise one of
+// "windows", "macos", "linux", "android".
 pref("browser.deviceSpoofing.preset", "");
+// User agent header, navigator.userAgent/platform/oscpu/appVersion.
 pref("browser.deviceSpoofing.navigator", true);
+// WebGL vendor, renderer and driver limits.
 pref("browser.deviceSpoofing.graphics", true);
+// GPU to report: empty for the device's default, a key of GPUS in
+// DeviceSpoofing.sys.mjs (e.g. "nvidia-rtx-3060-ti"), or "custom".
+pref("browser.deviceSpoofing.gpu", "");
+// Raw WebGL strings used when gpu is "custom"; empty keeps the default.
+pref("browser.deviceSpoofing.gpu.customVendor", "");
+pref("browser.deviceSpoofing.gpu.customRenderer", "");
+// Touch events, maxTouchPoints, pointer/hover media queries.
 pref("browser.deviceSpoofing.input", true);
+// Scrollbars, system colors, platform-only CSS.
 pref("browser.deviceSpoofing.appearance", true);
+// Report the device's fonts and hide all others.
 pref("browser.deviceSpoofing.fonts", true);
+// Report the window position on screen as 0.
 pref("browser.deviceSpoofing.window", true);
+// screen.width/height, CSS device-width/height and color depth.
+pref("browser.deviceSpoofing.screen", true);
+// "WIDTHxHEIGHT", "custom", or empty for the device's typical resolution.
+pref("browser.deviceSpoofing.screen.resolution", "");
+// "WIDTHxHEIGHT" used when screen.resolution is "custom".
+pref("browser.deviceSpoofing.screen.customResolution", "");
+// Device pixel ratio, e.g. "1" or "1.5"; empty keeps the real one.
+pref("browser.deviceSpoofing.screen.dppx", "");
+// Round the page area to common sizes (adds margins around pages).
+pref("browser.deviceSpoofing.letterboxing", false);
+// Disable OS-specific speech synthesis voices.
 pref("browser.deviceSpoofing.speech", true);
+// Independent of the preset: pages always appear visible and focused.
+pref("browser.deviceSpoofing.foreground", false);

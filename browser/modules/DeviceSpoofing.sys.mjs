@@ -216,6 +216,78 @@ const MAC_FAMILIES = {
  * WebGL renderer strings are fed through webgl::SanitizeRenderer, so they are
  * given in their raw driver form.
  */
+/**
+ * Selectable GPUs, with the raw WebGL strings each OS driver stack reports.
+ * Firefox sanitizes the renderer before exposing it, as it does for real GPUs.
+ */
+export const GPUS = Object.freeze({
+  "nvidia-rtx-3060-ti": {
+    name: "NVIDIA GeForce RTX 3060 Ti",
+    windows: {
+      vendor: "Google Inc. (NVIDIA)",
+      renderer:
+        "ANGLE (NVIDIA, NVIDIA GeForce RTX 3060 Ti Direct3D11 vs_5_0 ps_5_0, D3D11)",
+    },
+    linux: {
+      vendor: "NVIDIA Corporation",
+      renderer: "NVIDIA GeForce RTX 3060 Ti/PCIe/SSE2",
+    },
+  },
+  "nvidia-rtx-4070": {
+    name: "NVIDIA GeForce RTX 4070",
+    windows: {
+      vendor: "Google Inc. (NVIDIA)",
+      renderer:
+        "ANGLE (NVIDIA, NVIDIA GeForce RTX 4070 Direct3D11 vs_5_0 ps_5_0, D3D11)",
+    },
+    linux: {
+      vendor: "NVIDIA Corporation",
+      renderer: "NVIDIA GeForce RTX 4070/PCIe/SSE2",
+    },
+  },
+  "nvidia-gtx-1660-super": {
+    name: "NVIDIA GeForce GTX 1660 SUPER",
+    windows: {
+      vendor: "Google Inc. (NVIDIA)",
+      renderer:
+        "ANGLE (NVIDIA, NVIDIA GeForce GTX 1660 SUPER Direct3D11 vs_5_0 ps_5_0, D3D11)",
+    },
+    linux: {
+      vendor: "NVIDIA Corporation",
+      renderer: "NVIDIA GeForce GTX 1660 SUPER/PCIe/SSE2",
+    },
+  },
+  "amd-rx-6700-xt": {
+    name: "AMD Radeon RX 6700 XT",
+    windows: {
+      vendor: "Google Inc. (AMD)",
+      renderer:
+        "ANGLE (AMD, AMD Radeon RX 6700 XT Direct3D11 vs_5_0 ps_5_0, D3D11)",
+    },
+    linux: {
+      vendor: "AMD",
+      renderer:
+        "AMD Radeon RX 6700 XT (radeonsi, navi22, LLVM 17.0.6, DRM 3.57, 6.8.0)",
+    },
+  },
+  "intel-uhd-630": {
+    name: "Intel UHD Graphics 630",
+    windows: {
+      vendor: "Google Inc. (Intel)",
+      renderer:
+        "ANGLE (Intel, Intel(R) UHD Graphics 630 Direct3D11 vs_5_0 ps_5_0, D3D11)",
+    },
+    linux: {
+      vendor: "Intel",
+      renderer: "Mesa Intel(R) UHD Graphics 630 (CFL GT2)",
+    },
+    macos: {
+      vendor: "Intel Inc.",
+      renderer: "Intel(R) UHD Graphics 630",
+    },
+  },
+});
+
 export const PRESETS = Object.freeze({
   windows: {
     uaOS: "Windows NT 10.0; Win64; x64",
@@ -235,6 +307,7 @@ export const PRESETS = Object.freeze({
     scrollbarStyle: 5,
     overlayScrollbars: false,
     scrollbarSize: 17,
+    screen: { width: 1920, height: 1080 },
     fonts: {
       system: "Segoe UI",
       systemSize: "12",
@@ -253,6 +326,7 @@ export const PRESETS = Object.freeze({
     webglVendor: "Apple",
     webglRenderer: "Apple M1",
     input: DESKTOP_INPUT,
+    screen: { width: 1512, height: 982 },
     scrollbarStyle: 1,
     overlayScrollbars: true,
     fonts: {
@@ -273,6 +347,7 @@ export const PRESETS = Object.freeze({
     webglVendor: "Intel",
     webglRenderer: "Mesa Intel(R) UHD Graphics 620 (KBL GT2)",
     input: DESKTOP_INPUT,
+    screen: { width: 1920, height: 1080 },
     scrollbarStyle: 2,
     overlayScrollbars: true,
     fonts: {
@@ -289,6 +364,7 @@ export const PRESETS = Object.freeze({
     webglVendor: "Qualcomm",
     webglRenderer: "Adreno (TM) 640",
     input: { touchEvents: 1, maxTouchPoints: 5, pointer: POINTER_COARSE },
+    screen: { width: 412, height: 915 },
     scrollbarStyle: 3,
     overlayScrollbars: true,
     fonts: {
@@ -379,13 +455,28 @@ const CATEGORIES = {
       },
     };
   },
-  graphics: preset => ({
-    prefs: {
-      "webgl.override-unmasked-vendor": preset.webglVendor,
-      "webgl.override-unmasked-renderer": preset.webglRenderer,
-    },
-    webglPatch: !!preset.webglParams,
-  }),
+  graphics: (preset, _version, presetName) => {
+    let gpu = Services.prefs.getStringPref(PREF_BRANCH + "gpu", "");
+    let vendor = preset.webglVendor;
+    let renderer = preset.webglRenderer;
+    if (gpu == "custom") {
+      vendor =
+        Services.prefs.getStringPref(PREF_BRANCH + "gpu.customVendor", "") ||
+        vendor;
+      renderer =
+        Services.prefs.getStringPref(PREF_BRANCH + "gpu.customRenderer", "") ||
+        renderer;
+    } else if (Object.hasOwn(GPUS, gpu) && GPUS[gpu][presetName]) {
+      ({ vendor, renderer } = GPUS[gpu][presetName]);
+    }
+    return {
+      prefs: {
+        "webgl.override-unmasked-vendor": vendor,
+        "webgl.override-unmasked-renderer": renderer,
+      },
+      webglPatch: !!preset.webglParams,
+    };
+  },
   input: preset => ({
     prefs: {
       "dom.w3c_touch_events.enabled": preset.input.touchEvents,
@@ -442,11 +533,47 @@ const CATEGORIES = {
     return { prefs, sheet: css };
   },
   window: () => ({
-    targets: ["WindowOuterSize"],
+    // Not WindowOuterSize: outer == inner (no toolbars) is itself a tell.
+    targets: ["WindowScreenXY", "WindowInnerScreenXY"],
+  }),
+  screen: preset => {
+    let resolution = Services.prefs.getStringPref(
+      PREF_BRANCH + "screen.resolution",
+      ""
+    );
+    if (resolution == "custom") {
+      resolution = Services.prefs.getStringPref(
+        PREF_BRANCH + "screen.customResolution",
+        ""
+      );
+    }
+    let match = /^\s*(\d{3,5})\s*[x×]\s*(\d{3,5})\s*$/i.exec(resolution);
+    let dppx = parseFloat(
+      Services.prefs.getStringPref(PREF_BRANCH + "screen.dppx", "")
+    );
+    return {
+      screen: {
+        width: match ? parseInt(match[1]) : preset.screen.width,
+        height: match ? parseInt(match[2]) : preset.screen.height,
+        dppx: dppx > 0 ? dppx : 0,
+      },
+      targets: ["ScreenPixelDepth"],
+    };
+  },
+  letterboxing: () => ({
+    prefs: { "privacy.resistFingerprinting.letterboxing": true },
   }),
   speech: () => ({
     prefs: { "media.webspeech.synth.enabled": false },
   }),
+};
+
+// Not tied to a device preset: hides that a tab or window is in the background.
+const FOREGROUND_PREFS = {
+  "dom.min_background_timeout_value": 4,
+  "dom.min_background_timeout_value_without_budget_throttling": 4,
+  "dom.timeout.enable_budget_timer_throttling": false,
+  "media.block-autoplay-until-in-foreground": false,
 };
 
 export const DeviceSpoofing = {
@@ -454,6 +581,9 @@ export const DeviceSpoofing = {
   _initialized: false,
   _sheetURI: null,
   _actorRegistered: false,
+  // Screen override currently applied to top-level tabs, if any.
+  _screen: null,
+  _screenApplied: false,
 
   init() {
     if (this._initialized) {
@@ -462,12 +592,53 @@ export const DeviceSpoofing = {
     this._initialized = true;
     this.apply();
     Services.prefs.addObserver(PREF_BRANCH, this);
+    Services.obs.addObserver(this, "browsing-context-attached");
   },
 
-  observe(_subject, _topic, data) {
-    if (data != PREF_APPLIED) {
+  observe(subject, topic, data) {
+    if (topic == "browsing-context-attached") {
+      if (this._screenApplied) {
+        this._applyScreen(subject);
+      }
+    } else if (data != PREF_APPLIED) {
       this.apply();
     }
+  },
+
+  /**
+   * @param {CanonicalBrowsingContext} bc
+   */
+  _applyScreen(bc) {
+    // Leave Responsive Design Mode and non-tab contexts alone.
+    if (!bc.isContent || bc.parent || bc.inRDMPane || bc.isDiscarded) {
+      return;
+    }
+    try {
+      if (this._screen) {
+        bc.setScreenAreaOverride(this._screen.width, this._screen.height);
+        bc.overrideDPPX = this._screen.dppx;
+      } else {
+        bc.resetScreenAreaOverride();
+        bc.overrideDPPX = 0;
+      }
+    } catch (e) {
+      console.error(e);
+    }
+  },
+
+  _updateScreens(screen) {
+    if (!screen && !this._screenApplied) {
+      return;
+    }
+    this._screen = screen;
+    for (let win of Services.wm.getEnumerator("navigator:browser")) {
+      for (let browser of win.gBrowser?.browsers ?? []) {
+        if (browser.browsingContext) {
+          this._applyScreen(browser.browsingContext);
+        }
+      }
+    }
+    this._screenApplied = !!screen;
   },
 
   _readApplied() {
@@ -569,12 +740,13 @@ export const DeviceSpoofing = {
     let desiredTargets = new Set();
     let sheets = [];
     let webglPatch = false;
+    let screen = null;
     if (preset) {
       for (let [category, build] of Object.entries(CATEGORIES)) {
         if (!Services.prefs.getBoolPref(PREF_BRANCH + category, true)) {
           continue;
         }
-        let result = build(preset, version);
+        let result = build(preset, version, presetName);
         for (let [name, value] of Object.entries(result.prefs ?? {})) {
           desiredPrefs.set(name, value);
         }
@@ -583,6 +755,16 @@ export const DeviceSpoofing = {
           sheets.push(result.sheet);
         }
         webglPatch ||= !!result.webglPatch;
+        screen ??= result.screen ?? null;
+      }
+    }
+    let foreground = Services.prefs.getBoolPref(
+      PREF_BRANCH + "foreground",
+      false
+    );
+    if (foreground) {
+      for (let [name, value] of Object.entries(FOREGROUND_PREFS)) {
+        desiredPrefs.set(name, value);
       }
     }
 
@@ -597,7 +779,8 @@ export const DeviceSpoofing = {
     }
     this._updateOverrideTargets(new Set(previous.targets), desiredTargets);
     this._updateSheet(sheets.join("\n"));
-    this._updateActor(webglPatch);
+    this._updateActor(webglPatch || foreground);
+    this._updateScreens(screen);
 
     if (desiredPrefs.size || desiredTargets.size) {
       Services.prefs.setStringPref(

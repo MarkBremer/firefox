@@ -2808,9 +2808,80 @@ device-spoofing-fonts =
     .label = Fonts
     .description = Report the chosen system’s fonts and default fonts, drawn with similar local fonts when missing, and hide all other installed fonts.
 
-device-spoofing-window =
-    .label = Window frame size
-    .description = Report the window’s outer size as its inner size, hiding title bar and border sizes.
+device-spoofing-window2 =
+    .label = Window position
+    .description = Report the window’s position on screen as 0, hiding taskbar and panel placement.
+
+device-spoofing-screen =
+    .label = Screen size
+    .description = screen.width and height, CSS device-width and device-height, and color depth.
+
+device-spoofing-screen-resolution =
+    .label = Resolution
+
+device-spoofing-screen-resolution-auto =
+    .label = Typical for the reported device
+
+device-spoofing-screen-resolution-custom =
+    .label = Custom…
+
+device-spoofing-screen-resolution-custom-input =
+    .label = Custom resolution (width x height)
+
+device-spoofing-gpu =
+    .label = Graphics card
+
+device-spoofing-gpu-default =
+    .label = Typical for the reported device
+
+# Variables:
+#   $name (string) - Graphics card product name, e.g. NVIDIA GeForce RTX 3060 Ti
+device-spoofing-gpu-value =
+    .label = { $name }
+
+device-spoofing-gpu-custom =
+    .label = Custom…
+
+device-spoofing-gpu-custom-vendor =
+    .label = WebGL vendor
+    .description = For example “Google Inc. (NVIDIA)” on Windows.
+
+device-spoofing-gpu-custom-renderer =
+    .label = WebGL renderer
+    .description = The raw driver string, for example “ANGLE (NVIDIA, NVIDIA GeForce RTX 3060 Ti Direct3D11 vs_5_0 ps_5_0, D3D11)”. { -brand-short-name } shortens it like it does for real graphics cards.
+
+device-spoofing-gpu-unavailable =
+    .message = This graphics card does not exist for the reported device, so the device’s typical graphics card is reported instead.
+
+# Variables:
+#   $width (number) - Screen width in pixels
+#   $height (number) - Screen height in pixels
+device-spoofing-screen-resolution-value =
+    .label = { $width } × { $height }
+
+device-spoofing-screen-dppx =
+    .label = Device pixel ratio
+    .description = Changes how large pages are drawn on your real screen.
+
+device-spoofing-screen-dppx-auto =
+    .label = Real value
+
+# Variables:
+#   $ratio (number) - Device pixel ratio, e.g. 1.5
+device-spoofing-screen-dppx-value =
+    .label = { $ratio }
+
+device-spoofing-letterboxing =
+    .label = Round page size (letterboxing)
+    .description = Add margins around pages so their size matches common values instead of your exact window size.
+
+device-spoofing-behavior-group =
+    .label = Page behavior
+    .description = These options work even when the real device is reported.
+
+device-spoofing-foreground =
+    .label = Pages always appear in the foreground
+    .description = Background tabs and unfocused windows report themselves as visible and focused, and their timers are not slowed down.
 
 device-spoofing-speech =
     .label = Speech synthesis voices
