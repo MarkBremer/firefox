@@ -142,6 +142,12 @@ tabs. The "foreground" option is independent of the preset.
 - LookAndFeel ints can be overridden with `ui.<name>` prefs
   (`ui.useOverlayScrollbars`, `ui.primaryPointerCapabilities`, ...); stand-in
   colors (`ui.use_standins_for_native_colors`) take precedence over color prefs.
+- Portrait screens (height > width) also get
+  `BrowsingContext.setOrientationOverride("portrait-primary", 0)`. The page
+  area stays the desktop window unless letterboxing is on; then
+  `privacy.resistFingerprinting.letterboxing.dimensions` is set to
+  `<width>x<h>` sizes so the page becomes phone-shaped (otherwise "window
+  fits on screen" fails in the test page).
 - Screen size: `BrowsingContext.setScreenAreaOverride(w, h)` (top-level only,
   applies to frames and CSS `device-width`) and `overrideDPPX`; applied to all
   tabs plus new ones via the `browsing-context-attached` observer. Tabs in

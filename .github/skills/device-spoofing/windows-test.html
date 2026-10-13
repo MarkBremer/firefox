@@ -354,7 +354,9 @@ function declaredConsistency() {
     appVersion: osOf(navigator.appVersion),
   };
   const list = Object.entries(oses).filter(([, v]) => v);
-  const same = new Set(list.map(([, v]) => v)).size === 1;
+  // Android browsers report a Linux platform/oscpu ("Linux armv81").
+  const family = os => (os === "Linux" && oses.userAgent === "Android" ? "Android" : os);
+  const same = new Set(list.map(([, v]) => family(v))).size === 1;
   addC(g, "userAgent / platform / oscpu / appVersion agree",
        list.map(([k, v]) => `${k}: ${v}`).join(", "), same ? OK : LIE);
 
@@ -385,6 +387,16 @@ function screenConsistency() {
   addC(g, "Window fits on the screen",
        `inner ${innerWidth} × ${innerHeight}, screen ${screen.width} × ${screen.height}`, fits ? OK : LIE,
        "A window larger than the screen is impossible");
+
+  const portraitScreen = screen.height > screen.width;
+  const type = screen.orientation?.type ?? "?";
+  addC(g, "screen.orientation matches screen shape", `${type}, screen ${screen.width} × ${screen.height}`,
+       type.startsWith(portraitScreen ? "portrait" : "landscape") ? OK : LIE);
+  const portraitView = matchMedia("(orientation: portrait)").matches;
+  addC(g, "Page orientation matches screen orientation",
+       `page ${portraitView ? "portrait" : "landscape"}, screen ${portraitScreen ? "portrait" : "landscape"}`,
+       portraitView === portraitScreen ? OK : WARN,
+       "A portrait phone screen with a landscape page area is unusual");
 
   const avail = screen.availWidth <= screen.width && screen.availHeight <= screen.height;
   addC(g, "Available area within the screen",

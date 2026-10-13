@@ -35,8 +35,24 @@ const SCREEN_RESOLUTIONS = [
   "2560x1440",
   "3840x2160",
   "1512x982",
-  "412x915",
+];
+// CSS pixel sizes of common phones and tablets, held upright.
+const SCREEN_RESOLUTIONS_PORTRAIT = [
+  "360x800",
+  "360x780",
+  "375x667",
+  "375x812",
+  "384x854",
   "390x844",
+  "393x873",
+  "412x892",
+  "412x915",
+  "414x896",
+  "430x932",
+  "768x1024",
+  "800x1280",
+  "820x1180",
+  "834x1194",
 ];
 const SCREEN_DPPX = ["1", "1.25", "1.5", "2", "2.625", "3"];
 
@@ -327,6 +343,14 @@ SettingGroupManager.registerGroups({
                 return {
                   value,
                   l10nId: "device-spoofing-screen-resolution-value",
+                  l10nArgs: { width, height },
+                };
+              }),
+              ...SCREEN_RESOLUTIONS_PORTRAIT.map(value => {
+                let [width, height] = value.split("x");
+                return {
+                  value,
+                  l10nId: "device-spoofing-screen-resolution-portrait",
                   l10nArgs: { width, height },
                 };
               }),

@@ -2887,6 +2887,12 @@ device-spoofing-gpu-unavailable =
 device-spoofing-screen-resolution-value =
     .label = { $width } × { $height }
 
+# Variables:
+#   $width (number) - Screen width in pixels
+#   $height (number) - Screen height in pixels
+device-spoofing-screen-resolution-portrait =
+    .label = { $width } × { $height } (portrait, phone or tablet)
+
 device-spoofing-screen-dppx =
     .label = Device pixel ratio
     .description = Changes how large pages are drawn on your real screen.
@@ -2901,7 +2907,7 @@ device-spoofing-screen-dppx-value =
 
 device-spoofing-letterboxing =
     .label = Round page size (letterboxing)
-    .description = Add margins around pages so their size matches common values instead of your exact window size.
+    .description = Add margins around pages so their size matches common values instead of your exact window size. With a portrait (phone or tablet) resolution, pages are shown in a portrait area of that width.
 
 device-spoofing-behavior-group =
     .label = Page behavior

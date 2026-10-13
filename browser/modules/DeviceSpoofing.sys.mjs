@@ -633,10 +633,17 @@ export const DeviceSpoofing = {
     }
     try {
       if (this._screen) {
-        bc.setScreenAreaOverride(this._screen.width, this._screen.height);
+        let { width, height } = this._screen;
+        bc.setScreenAreaOverride(width, height);
         bc.overrideDPPX = this._screen.dppx;
+        if (height > width) {
+          bc.setOrientationOverride("portrait-primary", 0);
+        } else {
+          bc.resetOrientationOverride();
+        }
       } else {
         bc.resetScreenAreaOverride();
+        bc.resetOrientationOverride();
         bc.overrideDPPX = 0;
       }
     } catch (e) {
@@ -780,6 +787,22 @@ export const DeviceSpoofing = {
       PREF_BRANCH + "foreground",
       false
     );
+    // A portrait screen needs a portrait page area to stay believable;
+    // letterboxing picks the largest of these that fits the window.
+    if (
+      screen &&
+      screen.height > screen.width &&
+      desiredPrefs.has("privacy.resistFingerprinting.letterboxing")
+    ) {
+      let sizes = [];
+      for (let h = screen.height - 56; h >= 400; h -= 20) {
+        sizes.push(`${screen.width}x${h}`);
+      }
+      desiredPrefs.set(
+        "privacy.resistFingerprinting.letterboxing.dimensions",
+        sizes.join(",")
+      );
+    }
     if (foreground) {
       for (let [name, value] of Object.entries(FOREGROUND_PREFS)) {
         desiredPrefs.set(name, value);
