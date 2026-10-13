@@ -74,6 +74,9 @@ most values with the real OS and the pane warns about it.
 ### 3. Repository tooling
 
 * `.github/copilot-instructions.md`: build, test and lint instructions for coding agents.
+* `.github/skills/device-spoofing/`: agent guide for this fork (`SKILL.md`), the
+  OS / lie-detection test page (`windows-test.html`) and its Marionette runner
+  (`run_wt.py`).
 
 ### Build, run and test
 

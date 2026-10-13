@@ -2,6 +2,8 @@
 
 Trust these instructions. Only search the tree when something here is incomplete or proves wrong. Also read `AGENTS.md` at the repo root (and the `AGENTS.md`/`CLAUDE.md` inside `js/`, `gfx/wr/`, `layout/`, `security/nss/`, `browser/extensions/newtab/` when touching those). Task-specific guides live in `.agents/skills/<name>/SKILL.md` (frontend, commits, mozlint, fluent-migration, android, webidl/C++, etc.); read the relevant one before starting.
 
+**This is a personal fork with a Device/OS spoofing feature and low-memory defaults.** Before touching it (or anything in `browser/modules/DeviceSpoofing*`, the Device spoofing settings pane, or fork prefs in `browser/app/profile/firefox.js`), read `.github/skills/device-spoofing/SKILL.md`. Never push to the `release` branch.
+
 ## What this repository is
 Source of the Firefox web browser (Gecko engine, desktop front-end, GeckoView/Firefox for Android, SpiderMonkey JS engine). Very large (hundreds of thousands of files, several GB). Languages: C++ (engine), Rust (Stylo, WebRender, many components, `Cargo.toml` workspace at root), JavaScript/HTML/CSS (browser UI, `*.sys.mjs` modules, devtools), Python (build system `mach`, test harnesses), Kotlin/Java (`mobile/android`), WebIDL, IPDL, XPIDL, Fluent (`.ftl`) for localized strings. Build system: `./mach` + `moz.build` files + `moz.configure`.
 

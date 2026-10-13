@@ -1,0 +1,664 @@
+<!DOCTYPE html>
+<!-- This Source Code Form is subject to the terms of the Mozilla Public
+   - License, v. 2.0. If a copy of the MPL was not distributed with this
+   - file, You can obtain one at http://mozilla.org/MPL/2.0/. -->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Are you using Windows?</title>
+<style>
+  :root { color-scheme: light dark; font-family: sans-serif; }
+  body { max-width: 1100px; margin: 2rem auto; padding: 0 1rem; }
+  .big { font-size: 2.2rem; font-weight: bold; margin-block: .5rem; }
+  .summary { color: #888; }
+  .bar { height: 1.2rem; background: #8884; border-radius: .6rem; overflow: hidden; }
+  .fill { height: 100%; width: 0; transition: width .6s; }
+  #fill { background: #2a7; }
+  #cfill { background: #37c; }
+  table { width: 100%; border-collapse: collapse; margin-top: 1rem; font-size: .9rem; }
+  th, td { text-align: start; padding: .4rem; border-bottom: 1px solid #8884; vertical-align: top; }
+  tr.group th { background: #8882; font-size: 1rem; }
+  td.value { font-family: monospace; word-break: break-word; max-width: 460px; }
+  .windows, .ok { color: #2a2; font-weight: bold; }
+  .other, .lie { color: #d33; font-weight: bold; }
+  .warn { color: #c80; font-weight: bold; }
+  .unknown, .info { color: #888; }
+  .note { color: #888; font-size: .8rem; }
+  button { font-size: 1rem; padding: .4rem 1rem; }
+  h2 { margin-top: 2.5rem; }
+</style>
+</head>
+<body>
+<h1>Are you using Windows?</h1>
+<button id="rerun">Run again</button>
+
+<h2>Operating system</h2>
+<div id="result" class="big">Testing…</div>
+<div class="bar"><div id="fill" class="fill"></div></div>
+<p id="summary" class="summary"></p>
+<table>
+  <thead><tr><th>Check</th><th>Value</th><th>Verdict</th><th>Weight</th></tr></thead>
+  <tbody id="rows"></tbody>
+</table>
+
+<h2>Consistency (lie detection)</h2>
+<p class="note">
+  Spoofing tools are often caught because values disagree with each other, or
+  because patched functions do not look native. These checks do not count
+  toward the Windows score.
+</p>
+<div id="cresult" class="big">Testing…</div>
+<div class="bar"><div id="cfill" class="fill"></div></div>
+<p id="csummary" class="summary"></p>
+<table>
+  <thead><tr><th>Check</th><th>Value</th><th>Result</th></tr></thead>
+  <tbody id="crows"></tbody>
+</table>
+
+<h2>Device information</h2>
+<table>
+  <thead><tr><th>Property</th><th>Value</th></tr></thead>
+  <tbody id="irows"></tbody>
+</table>
+
+<p class="note">
+  The HTTP User-Agent header cannot be read from a local file; check it on a site
+  such as browserleaks.com/ip. Verdicts: <span class="windows">Windows</span> /
+  <span class="other">not Windows</span> / <span class="unknown">no signal</span>
+  (not counted). Consistency: <span class="ok">consistent</span> /
+  <span class="warn">suspicious</span> / <span class="lie">inconsistent</span>.
+</p>
+
+<script>
+"use strict";
+
+const W = "windows", O = "other", U = "unknown";
+const OK = "ok", WARN = "warn", LIE = "lie", INFO = "info";
+let checks = [];
+let consistency = [];
+let info = [];
+
+function add(group, name, value, verdict, weight = 1, note = "") {
+  checks.push({ group, name, value: String(value), verdict, weight: verdict === U ? 0 : weight, note });
+}
+
+function addC(group, name, value, result, note = "") {
+  consistency.push({ group, name, value: String(value), verdict: result, note });
+}
+
+function addI(name, value) {
+  info.push({ name, value: String(value) });
+}
+
+function osOf(text) {
+  if (/Windows|Win32|Win64/i.test(text)) return "Windows";
+  if (/Android/i.test(text)) return "Android";
+  if (/Mac|iPhone|iPad/i.test(text)) return "macOS";
+  if (/Linux|X11/i.test(text)) return "Linux";
+  return "?";
+}
+
+// ---------------------------------------------------------------- OS checks
+
+function declared() {
+  const g = "Declared values (user agent and navigator)";
+  const ua = navigator.userAgent;
+  add(g, "navigator.userAgent", ua, /Windows/.test(ua) ? W : O, 2);
+  add(g, "navigator.platform", navigator.platform, /^Win/.test(navigator.platform) ? W : O, 2);
+  if ("oscpu" in navigator) {
+    add(g, "navigator.oscpu", navigator.oscpu, /Windows/.test(navigator.oscpu) ? W : O, 2);
+  } else {
+    add(g, "navigator.oscpu", "(not available in this browser)", U);
+  }
+  add(g, "navigator.appVersion", navigator.appVersion, /Win/.test(navigator.appVersion) ? W : O, 1);
+  if (navigator.userAgentData) {
+    const p = navigator.userAgentData.platform;
+    add(g, "navigator.userAgentData.platform", p, p === "Windows" ? W : O, 2);
+  } else {
+    add(g, "navigator.userAgentData", "(not available in this browser)", U);
+  }
+}
+
+function webglInfo(gl) {
+  const ext = gl.getExtension("WEBGL_debug_renderer_info");
+  return {
+    renderer: String(ext ? gl.getParameter(ext.UNMASKED_RENDERER_WEBGL) : gl.getParameter(gl.RENDERER)),
+    vendor: String(ext ? gl.getParameter(ext.UNMASKED_VENDOR_WEBGL) : gl.getParameter(gl.VENDOR)),
+    varyings: gl.getParameter(gl.MAX_VARYING_VECTORS),
+    lineWidth: Array.from(gl.getParameter(gl.ALIASED_LINE_WIDTH_RANGE)),
+  };
+}
+
+let mainGL = null;
+
+function graphics() {
+  const g = "Graphics (WebGL)";
+  const gl = document.createElement("canvas").getContext("webgl");
+  if (!gl) {
+    add(g, "WebGL", "unavailable", U);
+    return;
+  }
+  mainGL = webglInfo(gl);
+  const { renderer, vendor, varyings, lineWidth } = mainGL;
+
+  let v = U;
+  if (/Direct3D|D3D1[01]|D3D9/i.test(renderer)) {
+    v = W;
+  } else if (/Mesa|llvmpipe|softpipe|Gallium|OpenGL Engine|Apple|Metal|Adreno|Mali|PowerVR|on Vulkan|radeonsi|\/PCIe\/SSE2/i.test(renderer)) {
+    v = O;
+  }
+  add(g, "Unmasked renderer", renderer, v, 3, "Direct3D only exists on Windows");
+
+  let vv = U;
+  if (/^Google Inc\. \((?!Apple)/.test(vendor)) {
+    vv = W;
+  } else if (/^(Apple|Intel Inc\.|Intel|Qualcomm|ARM|Imagination|Mesa|X\.Org|AMD|nouveau|Collabora|NVIDIA Corporation|ATI)/i.test(vendor)) {
+    vv = O;
+  }
+  add(g, "Unmasked vendor", vendor, vv, 1, "ANGLE on Windows reports “Google Inc. (…)”");
+
+  add(g, "Max line width", lineWidth.join("–"), lineWidth[1] > 1 ? O : U, 2,
+      "Direct3D (ANGLE) only supports 1px lines; wider lines mean native OpenGL");
+  add(g, "MAX_VARYING_VECTORS", varyings, varyings === 30 ? W : O, 1,
+      "30 is typical of ANGLE on Direct3D 11");
+
+  const families = [
+    [/NVIDIA|GeForce|Quadro|RTX|GTX/i, "NVIDIA"],
+    [/AMD|Radeon/i, "AMD"],
+    [/Intel/i, "Intel"],
+    [/Apple/i, "Apple"],
+    [/Adreno|Mali|PowerVR/i, "Mobile"],
+    [/llvmpipe|softpipe|SwiftShader|Basic Render/i, "Software"],
+  ];
+  addI("GPU family", families.find(([re]) => re.test(renderer))?.[1] ?? "?");
+}
+
+const ctx = document.createElement("canvas").getContext("2d");
+const SAMPLES = ["mmmmmmmmmmlli WW 1234 @#&", "The quick brown fox ÄÖÜ ß"];
+
+function widths(font) {
+  ctx.font = font;
+  return SAMPLES.map(s => ctx.measureText(s).width).join(",");
+}
+
+function hasFont(name) {
+  return ["monospace", "sans-serif", "serif"].some(
+    base => widths(`72px "${name}", ${base}`) !== widths(`72px ${base}`)
+  );
+}
+
+function sameAs(generic, family) {
+  return widths(`72px ${generic}`) === widths(`72px "${family}", serif`);
+}
+
+function fonts() {
+  const g = "Fonts";
+  const winFonts = ["Segoe UI", "Segoe UI Symbol", "Segoe UI Emoji", "Segoe MDL2 Assets",
+    "Segoe Print", "Segoe Script", "Bahnschrift", "Ebrima", "Gadugi", "Leelawadee UI",
+    "Malgun Gothic", "Microsoft Himalaya", "Microsoft JhengHei", "Microsoft YaHei",
+    "Myanmar Text", "Nirmala UI", "Sylfaen", "Marlett", "Ink Free", "Gabriola",
+    "Javanese Text", "MV Boli", "Franklin Gothic Medium", "Candara", "Corbel", "Constantia"];
+  const macFonts = ["Helvetica Neue", "Lucida Grande", "Menlo", "Monaco", "Geneva",
+    "Apple Color Emoji", "Apple SD Gothic Neo", "Avenir", "Avenir Next", "Hiragino Sans",
+    "PingFang SC", "Optima", "Futura", "Gill Sans", "Chalkboard", "Marker Felt", "Skia"];
+  const linuxFonts = ["DejaVu Sans", "DejaVu Sans Mono", "DejaVu Serif", "Liberation Sans",
+    "Liberation Mono", "Cantarell", "Ubuntu", "Ubuntu Mono", "Noto Color Emoji",
+    "Droid Sans", "FreeSans", "Nimbus Sans", "C059", "Bitstream Vera Sans",
+    "Adwaita Sans", "Adwaita Mono"];
+  const androidFonts = ["Roboto", "Noto Sans", "Droid Sans Mono", "Cutive Mono", "Coming Soon"];
+
+  const found = list => list.filter(hasFont);
+  const wf = found(winFonts), mf = found(macFonts), lf = found(linuxFonts), af = found(androidFonts);
+
+  let wv = U;
+  if (wf.length >= 2) {
+    wv = W;
+  } else if (wf.length === 0) {
+    wv = O;
+  }
+  add(g, "Windows-only fonts", `${wf.length}/${winFonts.length}: ${wf.join(", ") || "none"}`,
+      wv, 3, "Segoe UI and friends ship with every Windows 10/11");
+  add(g, "macOS-only fonts", `${mf.length}/${macFonts.length}: ${mf.join(", ") || "none"}`,
+      mf.length >= 2 ? O : U, 3);
+  add(g, "Linux fonts", `${lf.length}/${linuxFonts.length}: ${lf.join(", ") || "none"}`,
+      lf.length >= 2 ? O : U, 3);
+  add(g, "Android fonts", `${af.length}/${androidFonts.length}: ${af.join(", ") || "none"}`,
+      af.length >= 3 ? O : U, 2);
+
+  const sysUiSegoe = wf.includes("Segoe UI") && sameAs("system-ui", "Segoe UI");
+  add(g, "system-ui is Segoe UI", sysUiSegoe, sysUiSegoe ? W : O, 2);
+
+  const el = document.createElement("span");
+  document.body.append(el);
+  const families = new Set();
+  for (const kw of ["menu", "caption", "message-box", "status-bar", "small-caption", "icon"]) {
+    el.style.font = kw;
+    families.add(getComputedStyle(el).fontFamily);
+  }
+  el.remove();
+  const fam = [...families].join(" | ");
+  let fv = U;
+  if (/Segoe/i.test(fam)) {
+    fv = W;
+  } else if (/Cantarell|Ubuntu|DejaVu|Noto|Adwaita|Inter|Liberation|Lucida Grande|Helvetica|San Francisco|apple-system|SF Pro|Roboto|Oxygen|Droid/i.test(fam)) {
+    fv = O;
+  }
+  add(g, "System font keywords (font: menu, caption…)", fam, fv, 2);
+
+  const sansArial = sameAs("sans-serif", "Arial");
+  add(g, "Default sans-serif is Arial", sansArial, sansArial ? W : O, 1);
+  const serifTimes = sameAs("serif", "Times New Roman");
+  add(g, "Default serif is Times New Roman", serifTimes, serifTimes ? W : O, 1);
+  const monoConsolas = hasFont("Consolas") && sameAs("monospace", "Consolas");
+  add(g, "Default monospace is Consolas", monoConsolas, monoConsolas ? W : O, 1);
+
+  addI("document.fonts (web fonts on this page)", document.fonts.size);
+}
+
+function appearance() {
+  const g = "Appearance";
+  const d = document.createElement("div");
+  d.style.cssText = "width:100px;height:100px;overflow:scroll;position:absolute;top:-999px";
+  document.body.append(d);
+  const sw = d.offsetWidth - d.clientWidth;
+  d.remove();
+  let sv = U;
+  if (sw === 17) {
+    sv = W;
+  } else if (sw === 15) {
+    sv = O;
+  }
+  add(g, "Scrollbar width (px)", sw, sv, 1, "17 = classic Windows, 15 = macOS, 0 = overlay (any OS)");
+
+  const osx = CSS.supports("-moz-osx-font-smoothing", "grayscale");
+  add(g, "-moz-osx-font-smoothing supported", osx, osx ? O : U, 2, "Only exposed on macOS");
+
+  const el = document.createElement("span");
+  document.body.append(el);
+  el.style.color = "Highlight";
+  const hl = getComputedStyle(el).color;
+  el.style.color = "AccentColor";
+  const accent = getComputedStyle(el).color;
+  el.remove();
+  let hv = U;
+  if (/^rgb\(0, 120, 21[25]\)$/.test(hl)) {
+    hv = W;
+  } else if (/^rgb\(53, 132, 228\)$/.test(hl)) {
+    hv = O;
+  }
+  add(g, "Highlight system color", hl, hv, 0.5, "Windows default accent is rgb(0, 120, 215)");
+  addI("AccentColor", accent);
+}
+
+function input() {
+  const g = "Input";
+  const coarse = matchMedia("(pointer: coarse)").matches;
+  const hover = matchMedia("(hover: hover)").matches;
+  add(g, "Primary pointer", `${coarse ? "coarse" : "fine"}, hover: ${hover}`, coarse ? O : U, 1,
+      "A coarse primary pointer means a phone/tablet");
+  add(g, "Touch", `ontouchstart: ${"ontouchstart" in window}, maxTouchPoints: ${navigator.maxTouchPoints}`, U);
+}
+
+function screenGeometry() {
+  const g = "Screen";
+  const top = screen.availTop ?? 0;
+  const bottomBar = screen.height - screen.availHeight - top;
+  let v = U;
+  if (top > 0) {
+    v = O;
+  } else if (bottomBar >= 30 && bottomBar <= 72) {
+    v = W;
+  }
+  add(g, "Reserved screen area", `top: ${top}px, bottom: ${bottomBar}px`, v, 1,
+      "Windows taskbar sits at the bottom; macOS menu bar and GNOME panel at the top");
+
+  const mobile = screen.width < 600 && screen.height > screen.width;
+  add(g, "Screen shape", `${screen.width} × ${screen.height}`, mobile ? O : U, 1,
+      "A narrow portrait screen means a phone");
+}
+
+async function speech() {
+  const g = "Speech synthesis";
+  if (!("speechSynthesis" in window)) {
+    add(g, "Voices", "(API not available)", U);
+    return;
+  }
+  let voices = speechSynthesis.getVoices();
+  if (!voices.length) {
+    await new Promise(resolve => {
+      speechSynthesis.addEventListener("voiceschanged", resolve, { once: true });
+      setTimeout(resolve, 1500);
+    });
+    voices = speechSynthesis.getVoices();
+  }
+  const names = voices.map(v => v.name);
+  let v = U;
+  if (names.some(n => /Microsoft/i.test(n))) {
+    v = W;
+  } else if (names.length) {
+    v = O;
+  }
+  add(g, "Voices", names.slice(0, 8).join(", ") + (names.length > 8 ? ` … (${names.length})` : "") || "none",
+      v, 2, "Windows ships “Microsoft …” voices");
+}
+
+// --------------------------------------------------------- Consistency checks
+
+function declaredConsistency() {
+  const g = "Declared values";
+  const oses = {
+    userAgent: osOf(navigator.userAgent),
+    platform: osOf(navigator.platform),
+    oscpu: "oscpu" in navigator ? osOf(navigator.oscpu) : null,
+    appVersion: osOf(navigator.appVersion),
+  };
+  const list = Object.entries(oses).filter(([, v]) => v);
+  const same = new Set(list.map(([, v]) => v)).size === 1;
+  addC(g, "userAgent / platform / oscpu / appVersion agree",
+       list.map(([k, v]) => `${k}: ${v}`).join(", "), same ? OK : LIE);
+
+  const uaVersion = /Firefox\/(\d+)/.exec(navigator.userAgent)?.[1];
+  const rvVersion = /rv:(\d+)/.exec(navigator.userAgent)?.[1];
+  if (uaVersion) {
+    addC(g, "Firefox version and rv: agree", `Firefox/${uaVersion}, rv:${rvVersion}`,
+         uaVersion === rvVersion ? OK : LIE);
+    const isFirefox = typeof InstallTrigger !== "undefined" || "MozAppearance" in document.documentElement.style
+      || CSS.supports("-moz-appearance", "none");
+    addC(g, "Engine matches the Firefox user agent", isFirefox ? "Gecko features present" : "missing",
+         isFirefox ? OK : LIE);
+  }
+
+  const mobileUA = /Mobile|Android/.test(navigator.userAgent);
+  const coarse = matchMedia("(pointer: coarse)").matches;
+  addC(g, "Mobile user agent matches touch input",
+       `mobile UA: ${mobileUA}, coarse pointer: ${coarse}, maxTouchPoints: ${navigator.maxTouchPoints}`,
+       mobileUA === coarse && mobileUA === navigator.maxTouchPoints > 0 ? OK : LIE);
+}
+
+function screenConsistency() {
+  const g = "Screen and window";
+  const dw = matchMedia(`(device-width: ${screen.width}px) and (device-height: ${screen.height}px)`).matches;
+  addC(g, "screen size equals CSS device-width/height", `${screen.width} × ${screen.height}`, dw ? OK : LIE);
+
+  const fits = innerWidth <= screen.width && innerHeight <= screen.height;
+  addC(g, "Window fits on the screen",
+       `inner ${innerWidth} × ${innerHeight}, screen ${screen.width} × ${screen.height}`, fits ? OK : LIE,
+       "A window larger than the screen is impossible");
+
+  const avail = screen.availWidth <= screen.width && screen.availHeight <= screen.height;
+  addC(g, "Available area within the screen",
+       `${screen.availWidth} × ${screen.availHeight}`, avail ? OK : LIE);
+
+  const chrome = outerHeight - innerHeight;
+  addC(g, "Browser toolbars have a height", `outer − inner height: ${chrome}px`,
+       chrome > 0 ? OK : WARN, "0 happens in fullscreen, or when the window size is spoofed");
+
+  const dpr = window.devicePixelRatio;
+  const res = matchMedia(`(resolution: ${dpr}dppx)`).matches;
+  addC(g, "devicePixelRatio equals CSS resolution", dpr, res ? OK : LIE);
+
+  addC(g, "Color depth is common", `${screen.colorDepth} bit`,
+       [24, 30, 32].includes(screen.colorDepth) ? OK : WARN);
+}
+
+function nativeLook(fn, refFn, name, refName) {
+  const str = Function.prototype.toString.call(fn);
+  const refStr = Function.prototype.toString.call(refFn);
+  const issues = [];
+  if (!str.includes("[native code]")) issues.push("not native code");
+  if (str !== refStr.split(refName).join(name)) issues.push("toString differs from a real built-in");
+  if (fn.name !== refFn.name.split(refName).join(name)) issues.push(`name is "${fn.name}"`);
+  if (Object.hasOwn(fn, "prototype")) issues.push("has a prototype property");
+  return issues;
+}
+
+function nativeConsistency() {
+  const g = "Patched built-ins";
+  const desc = (proto, n) => Object.getOwnPropertyDescriptor(proto, n);
+
+  if (window.WebGLRenderingContext) {
+    const p = WebGLRenderingContext.prototype;
+    const issues = nativeLook(p.getParameter, p.getError, "getParameter", "getError");
+    addC(g, "WebGLRenderingContext.getParameter looks native", issues.join("; ") || "native", issues.length ? LIE : OK);
+  }
+  for (const n of ["hidden", "visibilityState"]) {
+    const issues = nativeLook(desc(Document.prototype, n).get, desc(Document.prototype, "title").get, n, "title");
+    addC(g, `document.${n} getter looks native`, issues.join("; ") || "native", issues.length ? LIE : OK);
+  }
+  const hf = nativeLook(Document.prototype.hasFocus, Document.prototype.getElementById, "hasFocus", "getElementById");
+  addC(g, "document.hasFocus looks native", hf.join("; ") || "native", hf.length ? LIE : OK);
+
+  for (const [obj, n] of [[Navigator.prototype, "userAgent"], [Navigator.prototype, "platform"], [Screen.prototype, "width"]]) {
+    const d = desc(obj, n);
+    const ok = d && d.get && Function.prototype.toString.call(d.get).includes("[native code]");
+    addC(g, `${obj === Screen.prototype ? "screen" : "navigator"}.${n} getter is native`, ok ? "native" : "patched", ok ? OK : LIE);
+  }
+}
+
+async function visibilityConsistency() {
+  const g = "Visibility";
+  const fired = await new Promise(resolve => {
+    const t = setTimeout(() => resolve(false), 1000);
+    requestAnimationFrame(() => {
+      clearTimeout(t);
+      resolve(true);
+    });
+  });
+  const hidden = document.hidden;
+  let r = OK;
+  if (!hidden && !fired) {
+    r = LIE;
+  } else if (hidden && fired) {
+    r = WARN;
+  }
+  addC(g, "document.hidden matches animation frames",
+       `hidden: ${hidden}, visibilityState: ${document.visibilityState}, frame within 1s: ${fired}`, r,
+       "Background tabs do not draw frames; a 'visible' page without frames is lying");
+  addC(g, "hasFocus matches visibility", `hasFocus: ${document.hasFocus()}, hidden: ${hidden}`,
+       document.hasFocus() && hidden ? LIE : OK);
+}
+
+function runWorker(code) {
+  return new Promise(resolve => {
+    let w;
+    try {
+      w = new Worker(URL.createObjectURL(new Blob([code], { type: "text/javascript" })));
+    } catch (e) {
+      resolve({ error: String(e) });
+      return;
+    }
+    const t = setTimeout(() => {
+      w.terminate();
+      resolve({ error: "timeout" });
+    }, 4000);
+    w.onmessage = e => {
+      clearTimeout(t);
+      w.terminate();
+      resolve(e.data);
+    };
+    w.onerror = e => {
+      clearTimeout(t);
+      e.preventDefault();
+      resolve({ error: e.message || "worker error" });
+    };
+  });
+}
+
+async function workerConsistency() {
+  const g = "Workers";
+  const r = await runWorker(`
+    const r = { ua: navigator.userAgent, platform: navigator.platform,
+                appVersion: navigator.appVersion, cores: navigator.hardwareConcurrency };
+    try {
+      const gl = new OffscreenCanvas(1, 1).getContext("webgl");
+      if (gl) {
+        const ext = gl.getExtension("WEBGL_debug_renderer_info");
+        r.renderer = String(ext ? gl.getParameter(ext.UNMASKED_RENDERER_WEBGL) : gl.getParameter(gl.RENDERER));
+        r.varyings = gl.getParameter(gl.MAX_VARYING_VECTORS);
+      }
+    } catch (e) { r.glError = String(e); }
+    postMessage(r);`);
+  if (r.error) {
+    addC(g, "Worker", r.error, INFO);
+    return;
+  }
+  addC(g, "Worker userAgent equals page", r.ua, r.ua === navigator.userAgent ? OK : LIE);
+  addC(g, "Worker platform equals page", r.platform, r.platform === navigator.platform ? OK : LIE);
+  addC(g, "Worker appVersion equals page", r.appVersion, r.appVersion === navigator.appVersion ? OK : LIE);
+  addC(g, "Worker hardwareConcurrency equals page", r.cores, r.cores === navigator.hardwareConcurrency ? OK : LIE);
+  if (mainGL && r.renderer !== undefined) {
+    addC(g, "Worker WebGL renderer equals page", r.renderer, r.renderer === mainGL.renderer ? OK : LIE);
+    addC(g, "Worker WebGL MAX_VARYING_VECTORS equals page", r.varyings, r.varyings === mainGL.varyings ? OK : LIE,
+         "Page-level patches often miss OffscreenCanvas in workers");
+  } else if (r.glError) {
+    addC(g, "Worker WebGL", r.glError, INFO);
+  }
+}
+
+async function iframeConsistency() {
+  const g = "Frames";
+  const f = document.createElement("iframe");
+  f.style.display = "none";
+  document.body.append(f);
+  await new Promise(r => setTimeout(r, 0));
+  try {
+    const w = f.contentWindow;
+    addC(g, "iframe platform equals page", w.navigator.platform,
+         w.navigator.platform === navigator.platform ? OK : LIE);
+    addC(g, "iframe screen equals page", `${w.screen.width} × ${w.screen.height}`,
+         w.screen.width === screen.width && w.screen.height === screen.height ? OK : LIE);
+    const gl = w.document.createElement("canvas").getContext("webgl");
+    if (gl && mainGL) {
+      const v = gl.getParameter(gl.MAX_VARYING_VECTORS);
+      addC(g, "iframe WebGL MAX_VARYING_VECTORS equals page", v, v === mainGL.varyings ? OK : LIE);
+    }
+    const gp = w.WebGLRenderingContext?.prototype.getParameter;
+    if (gp) {
+      addC(g, "iframe getParameter is the same kind as page", gp === WebGLRenderingContext.prototype.getParameter ? "same object" : "separate (normal)", OK);
+    }
+  } catch (e) {
+    addC(g, "iframe", String(e), INFO);
+  } finally {
+    f.remove();
+  }
+}
+
+function deviceInfo() {
+  addI("Screen", `${screen.width} × ${screen.height} (available ${screen.availWidth} × ${screen.availHeight}, at ${screen.availLeft ?? 0}, ${screen.availTop ?? 0})`);
+  addI("Color depth", `${screen.colorDepth} bit`);
+  addI("devicePixelRatio", window.devicePixelRatio);
+  addI("Window inner", `${innerWidth} × ${innerHeight}`);
+  addI("Window outer", `${outerWidth} × ${outerHeight}`);
+  addI("Window position", `${screenX}, ${screenY}`);
+  addI("Orientation", screen.orientation?.type ?? "?");
+  addI("hardwareConcurrency", navigator.hardwareConcurrency);
+  addI("Language", `${navigator.language} (${navigator.languages.join(", ")})`);
+  addI("Time zone", Intl.DateTimeFormat().resolvedOptions().timeZone);
+  if (mainGL) {
+    addI("WebGL vendor", mainGL.vendor);
+    addI("WebGL renderer", mainGL.renderer);
+  }
+  addI("Visibility", `${document.visibilityState}, focused: ${document.hasFocus()}`);
+}
+
+// ------------------------------------------------------------------ Rendering
+
+function fillTable(tbodyId, list, labels, showWeight) {
+  const rows = document.getElementById(tbodyId);
+  rows.textContent = "";
+  const cols = showWeight ? 4 : 3;
+  let group = null;
+  for (const c of list) {
+    if (c.group !== group) {
+      group = c.group;
+      const tr = rows.insertRow();
+      tr.className = "group";
+      const th = document.createElement("th");
+      th.colSpan = cols;
+      th.textContent = group;
+      tr.append(th);
+    }
+    const tr = rows.insertRow();
+    const name = tr.insertCell();
+    name.textContent = c.name;
+    if (c.note) {
+      const n = document.createElement("div");
+      n.className = "note";
+      n.textContent = c.note;
+      name.append(n);
+    }
+    const value = tr.insertCell();
+    value.className = "value";
+    value.textContent = c.value;
+    const verdict = tr.insertCell();
+    verdict.className = c.verdict;
+    verdict.textContent = labels[c.verdict];
+    if (showWeight) {
+      tr.insertCell().textContent = c.weight || "–";
+    }
+  }
+}
+
+function render() {
+  fillTable("rows", checks, { windows: "Windows", other: "not Windows", unknown: "no signal" }, true);
+  const sum = v => checks.filter(c => c.verdict === v).reduce((a, c) => a + c.weight, 0);
+  const win = sum(W), other = sum(O);
+  const count = (list, v) => list.filter(c => c.verdict === v).length;
+  if (win + other === 0) {
+    document.getElementById("result").textContent = "Not enough signals";
+  } else {
+    const pct = Math.round((100 * win) / (win + other));
+    document.getElementById("result").textContent = `You are using Windows: ${pct}%`;
+    document.getElementById("fill").style.width = `${pct}%`;
+    document.getElementById("summary").textContent =
+      `${count(checks, W)} checks say Windows, ${count(checks, O)} say not Windows, ` +
+      `${count(checks, U)} give no signal (weighted score ${win} vs ${other}).`;
+  }
+
+  fillTable("crows", consistency,
+            { ok: "consistent", warn: "suspicious", lie: "inconsistent", info: "n/a" }, false);
+  const ok = count(consistency, OK), warn = count(consistency, WARN), lie = count(consistency, LIE);
+  const scored = ok + warn + lie;
+  const cpct = scored ? Math.round((100 * (ok + warn / 2)) / scored) : 0;
+  document.getElementById("cresult").textContent = `Consistency: ${cpct}%`;
+  document.getElementById("cfill").style.width = `${cpct}%`;
+  document.getElementById("csummary").textContent =
+    `${ok} consistent, ${warn} suspicious, ${lie} inconsistent.`;
+
+  const irows = document.getElementById("irows");
+  irows.textContent = "";
+  for (const i of info) {
+    const tr = irows.insertRow();
+    tr.insertCell().textContent = i.name;
+    const v = tr.insertCell();
+    v.className = "value";
+    v.textContent = i.value;
+  }
+}
+
+async function run() {
+  checks = [];
+  consistency = [];
+  info = [];
+  document.getElementById("result").textContent = "Testing…";
+  document.getElementById("cresult").textContent = "Testing…";
+  const steps = [declared, graphics, fonts, appearance, input, screenGeometry, speech,
+                 declaredConsistency, screenConsistency, nativeConsistency,
+                 visibilityConsistency, workerConsistency, iframeConsistency, deviceInfo];
+  for (const step of steps) {
+    try {
+      await step();
+    } catch (e) {
+      addC("Errors", step.name, e, INFO);
+    }
+  }
+  render();
+  document.body.dataset.done = "true";
+}
+
+document.getElementById("rerun").addEventListener("click", run);
+run();
+</script>
+</body>
+</html>
